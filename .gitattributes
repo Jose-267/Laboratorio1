@@ -1,2 +1,107 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+.include "M328PDEF.inc"
+.cseg
+.org 0x0000
+
+
+SETUP:
+
+	LDI R16, 0x00
+    OUT DDRC, R16        ; Configura PORTC como entrada
+    LDI R16, 0xFF
+    OUT PORTC, R16       ; Habilitar resistencias pull-up en PORTC
+
+    LDI R16, 0xFF
+    OUT DDRD, R16        ; Configura PORTD como salida
+    LDI R16, 0x00
+    OUT PORTD, R16       ; Inicializa PORTD en 0
+
+    LDI R20, 0x00        ; Contador 1 (nibble bajo)
+    LDI R21, 0x00        ; Contador 2 (nibble alto)
+    LDI R17, 0xFF        ; Estado inicial de los botones
+
+LOOP:
+	IN R16, PINC // Se lee el puerto por si se presiona un boton
+	CP R17, R16 // Comparamos para ver si se presiono
+	BREQ LOOP  // Si no existe cambio regresa al loop
+	CALL DELAY
+	IN R16, PINC // Leer el puerto D nuevamente despues del delay
+	CP R17, R16
+	BREQ LOOP
+	MOV R17, R16 // Guardando Estado nuevo de botones
+
+	SBRC R16, 1          ; Verificar si el botón en PC1 está presionado
+    RJMP SKIP_INCR1
+    CALL INCR1
+	SKIP_INCR1:
+
+	SBRC R16, 0          ; Verificar si el botón en PC0 está presionado
+    RJMP SKIP_DECR1
+    CALL DECR1
+	SKIP_DECR1:
+
+	SBRC R16, 3          ; Verificar si el botón en PC3 está presionado
+    RJMP SKIP_INCR2
+    CALL INCR2
+	SKIP_INCR2:
+
+    SBRC R16, 2          ; Verificar si el botón en PC2 está presionado
+    RJMP LOOP
+    CALL DECR2
+
+    RJMP LOOP            ; Volver al bucle principal
+
+
+INCR1:
+    INC R20
+    ANDI R20, 0x0F       ; Limitar a 4 bits (0–15)
+    CALL UPDATE_PORTD
+    RET
+
+DECR1:
+    DEC R20
+    ANDI R20, 0x0F       ; Limitar a 4 bits (0–15)
+    CALL UPDATE_PORTD
+    RET
+	
+INCR2:
+    INC R21
+    ANDI R21, 0x0F       ; Limitar a 4 bits (0–15)
+    CALL UPDATE_PORTD
+    RET
+
+DECR2:
+    DEC R21
+    ANDI R21, 0x0F       ; Limitar a 4 bits (0–15)
+    CALL UPDATE_PORTD
+    RET
+
+UPDATE_PORTD:
+    MOV R22, R20         ; Copiar el contador 1 al nibble bajo
+    MOV R23, R21         ; Copiar el contador 2
+
+    LSL R23              ; Desplazar 4 bits hacia la izquierda (nibble alto)
+    LSL R23
+    LSL R23
+    LSL R23
+
+    OR R22, R23          ; Combinar ambos contadores
+    OUT PORTD, R22       ; Actualizar el puerto D
+    RET
+
+DELAY:
+		LDI R18, 0
+	SUBDELAY1:
+		INC R18
+		CPI R18, 0
+		BRNE SUBDELAY1
+		LDI R18, 0
+	SUBDELAY2:
+		INC R18
+		CPI R18, 0
+		BRNE SUBDELAY2
+		LDI R18, 0
+	SUBDELAY3:
+		INC R18
+		CPI R18, 0
+		BRNE SUBDELAY3
+	RET
